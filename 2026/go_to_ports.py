@@ -10,16 +10,17 @@ motor_left = HardMotor(pwm_channel=PWM_CHANNEL_2, hz=PWM_FREQ, chip=PWM_CHIP)
 motor_right = HardMotor(pwm_channel=PWM_CHANNEL_1, hz=PWM_FREQ, chip=PWM_CHIP)
 time.sleep(3)
 Yellow = {"obrez": "170", "h_min": "87", "s_min": "92", "s_max": "255", "v_min": "179", "v_max": "255", "h_max": "99",
-          'stop_area': 90000}
+          'stop_area': 900000}
 Green = {"obrez":"170","h_min":"60","s_min":"127","s_max":"255","v_min":"102","v_max":"255","h_max":"84",
-         'stop_area': 92000}
+         'stop_area': 920000}
 Red = {"obrez": "170", "h_min": "103", "s_min": "84", "s_max": "255", "v_min": "73", "v_max": "255", "h_max": "179",
-       'stop_area': 100000}
+       'stop_area': 1000000}
 Orange = {"obrez": "170", "h_min": "101", "s_min": "197", "s_max": "255", "v_min": "174", "v_max": "255",
           "h_max": "116"}
 
 queue = [Yellow, Green, Red]
 queue_name = ['Yellow', 'Green', 'Red']
+min_y_point_contour = 0
 print()
 img = cam.get_frame()
 hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -116,8 +117,8 @@ try:
         if best_index == -1:
             speed = 20
             reverse = False
-            motor_left.set_motor(speed * ((2 * int(reverse)) - 1))
-            motor_right.set_motor(speed * ((-2 * int(reverse)) + 1))
+            # motor_left.set_motor(speed * ((2 * int(reverse)) - 1))
+            # motor_right.set_motor(speed * ((-2 * int(reverse)) + 1))
             continue
 
         # Выбранный цвет и его контуры
@@ -127,20 +128,16 @@ try:
         print('c_area', c_area)
         print(queue_name[best_index])
         # raw = best_raw  # можно использовать для отладки или записи видео
-        [173, 524]
-        [374, 313]
-
-        [498, 277]
-        [728, 388]
         # Если площадь достаточно велика, начинаем управление
         if c_area > 1000:
-            if color_max['stop_area'] > c_area:
+            if min_y_point_contour >= cntr.y*2-5:
                 # Берём первый (самый большой) контур
                 largest_contour = contours_color_max[0]
-                min_y_point_contour = max(largest_contour, key=lambda point: point[0].tolist()[1])[0].tolist()
-                print(min_y_point_contour)
+                min_y_point_contour = max(largest_contour, key=lambda point: point[0].tolist()[1])[0].tolist()[1]
+                # print(min_y_point_contour)
                 color_cntr = getCenter(largest_contour)
-                cv2.circle(best_raw, min_y_point_contour, 10, (0, 0, 0), -1)
+                cv2.line(best_raw, (0, min_y_point_contour), (820, min_y_point_contour), (0, 0, 0), 3)
+                best_raw = cv2.putText(best_raw, str(min_y_point_contour), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
                 out.write(
                     cv2.drawContours(cv2.cvtColor(best_raw, cv2.COLOR_BGR2RGB), contours_color_max, -1, (255, 0, 0), -1))
                 delta_x = (cntr - color_cntr).x
