@@ -6,6 +6,7 @@ try:
     time.sleep(2)
     motor_left.set_motor(0)
     motor_right.set_motor(0)
+    print('sleep')
     time.sleep(100000)
 except KeyboardInterrupt:pass
 motor_left.set_motor(0)

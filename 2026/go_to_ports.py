@@ -1,20 +1,16 @@
-import cv2
 import traceback
+
 from hard_control.abstractions import *
 from hard_control.hard_camera import *
 from hard_control.hard_motors import *
-import numpy as np
 
 cam = HardCamera()
 motor_left = HardMotor(pwm_channel=PWM_CHANNEL_2, hz=PWM_FREQ, chip=PWM_CHIP)
 motor_right = HardMotor(pwm_channel=PWM_CHANNEL_1, hz=PWM_FREQ, chip=PWM_CHIP)
 time.sleep(3)
-Yellow = {"obrez": "170", "h_min": "87", "s_min": "92", "s_max": "255", "v_min": "179", "v_max": "255", "h_max": "99",
-          'stop_area': 900000}
-Green = {"obrez":"170","h_min":"60","s_min":"127","s_max":"255","v_min":"102","v_max":"255","h_max":"84",
-         'stop_area': 920000}
-Red = {"obrez": "170", "h_min": "103", "s_min": "84", "s_max": "255", "v_min": "73", "v_max": "255", "h_max": "179",
-       'stop_area': 1000000}
+Yellow = {"obrez": "170", "h_min": "87", "s_min": "92", "s_max": "255", "v_min": "179", "v_max": "255", "h_max": "99"}
+Green = {"obrez": "170", "h_min": "60", "s_min": "127", "s_max": "255", "v_min": "102", "v_max": "255", "h_max": "84"}
+Red = {"obrez": "170", "h_min": "103", "s_min": "84", "s_max": "255", "v_min": "73", "v_max": "255", "h_max": "179"}
 Orange = {"obrez": "170", "h_min": "101", "s_min": "197", "s_max": "255", "v_min": "174", "v_max": "255",
           "h_max": "116"}
 
@@ -27,7 +23,7 @@ hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
 cntr = Point(img.shape[1::-1]) / 2
 PID_yaw = PID_regulator(-0.04, 0, 0, 0)
-PID_speed = PID_regulator(0.0005, 0, 0, 90000)
+PID_speed = PID_regulator(0.0005, 0, 0, 100000)
 
 detector = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100),
                                    cv2.aruco.DetectorParameters())
@@ -117,8 +113,8 @@ try:
         if best_index == -1:
             speed = 20
             reverse = False
-            # motor_left.set_motor(speed * ((2 * int(reverse)) - 1))
-            # motor_right.set_motor(speed * ((-2 * int(reverse)) + 1))
+            motor_left.set_motor(speed * ((2 * int(reverse)) - 1))
+            motor_right.set_motor(speed * ((-2 * int(reverse)) + 1))
             continue
 
         # Выбранный цвет и его контуры
@@ -129,42 +125,49 @@ try:
         print(queue_name[best_index])
         # raw = best_raw  # можно использовать для отладки или записи видео
         # Если площадь достаточно велика, начинаем управление
-        if c_area > 1000:
-            if min_y_point_contour >= cntr.y*2-5:
-                # Берём первый (самый большой) контур
-                largest_contour = contours_color_max[0]
-                min_y_point_contour = max(largest_contour, key=lambda point: point[0].tolist()[1])[0].tolist()[1]
-                # print(min_y_point_contour)
-                color_cntr = getCenter(largest_contour)
-                cv2.line(best_raw, (0, min_y_point_contour), (820, min_y_point_contour), (0, 0, 0), 3)
-                best_raw = cv2.putText(best_raw, str(min_y_point_contour), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-                out.write(
-                    cv2.drawContours(cv2.cvtColor(best_raw, cv2.COLOR_BGR2RGB), contours_color_max, -1, (255, 0, 0), -1))
+        if c_area > 500:
+
+            # Берём первый (самый большой) контур
+            largest_contour = contours_color_max[0]
+            min_y_point_contour = max(largest_contour, key=lambda point: point[0].tolist()[1])[0].tolist()[1]
+            # print(min_y_point_contour)
+            color_cntr = getCenter(largest_contour)
+            cv2.line(best_raw, (0, min_y_point_contour), (820, min_y_point_contour), (0, 0, 0), 3)
+            best_raw = cv2.putText(best_raw, str(min_y_point_contour), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                   (255, 0, 0), 2)
+            out.write(
+                cv2.drawContours(cv2.cvtColor(best_raw, cv2.COLOR_BGR2RGB), contours_color_max, -1, (255, 0, 0), -1))
+            print(cntr.y * 2 - 5)
+            if min_y_point_contour <= cntr.y * 2 - 5:
                 delta_x = (cntr - color_cntr).x
                 u = PID_yaw(delta_x)
                 u_speed = PID_speed(c_area)
                 print('u_speed', u_speed)
                 print('u', u)
                 print('delta_x', delta_x)
-                # motor_left.set_motor(u_speed - u)
-                # motor_right.set_motor(u_speed + u)
+                motor_left.set_motor(u_speed - u)
+                motor_right.set_motor(u_speed + u)
                 # out.release()
                 # exit(0)
             else:
                 # Достигли нужной близости к цели – удаляем цвет из очереди и выходим
 
                 queue.pop(best_index)
+                motor_left.set_motor()
+                motor_right.set_motor()
+                time.sleep(3)
+                motor_left.set_motor(0)
+                motor_right.set_motor(0)
                 if len(queue) == 0:
                     break
         else:
             # Если площадь мала (менее 500) – тоже вращаемся
             speed = 20
             reverse = False
-            # motor_left.set_motor(speed * ((2 * int(reverse)) - 1))
-            # motor_right.set_motor(speed * ((-2 * int(reverse)) + 1))
+            motor_left.set_motor(speed * ((2 * int(reverse)) - 1))
+            motor_right.set_motor(speed * ((-2 * int(reverse)) + 1))
 except Exception as e:
     print("Произошла ошибка:")
     traceback.print_exc()
 
 out.release()
-
