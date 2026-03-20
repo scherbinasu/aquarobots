@@ -10,9 +10,11 @@ if __name__ == '__main__':
     motor_left = HardMotor(pwm_channel=PWM_CHANNEL_2, hz=PWM_FREQ, chip=PWM_CHIP)
     motor_right = HardMotor(pwm_channel=PWM_CHANNEL_1, hz=PWM_FREQ, chip=PWM_CHIP)
     time.sleep(3)
+else:
+    import cv2, time
 Yellow = {"obrez": "170", "h_min": "87", "s_min": "92", "s_max": "255", "v_min": "179", "v_max": "255", "h_max": "99"}
 Green = {"obrez": "170", "h_min": "60", "s_min": "127", "s_max": "255", "v_min": "102", "v_max": "255", "h_max": "84"}
-Red = {"obrez": "170", "h_min": "103", "s_min": "84", "s_max": "255", "v_min": "73", "v_max": "255", "h_max": "179"}
+Red = {"obrez": "170", "h_min": "120", "s_min": "84", "s_max": "255", "v_min": "73", "v_max": "255", "h_max": "180"}
 Orange = {"obrez": "170", "h_min": "101", "s_min": "197", "s_max": "255", "v_min": "174", "v_max": "255",
           "h_max": "116"}
 del_index_color = []
@@ -22,8 +24,8 @@ queue_name = ['Yellow', 'Green', 'Red']
 min_y_point_contour = 0
 # PID_yaw = PID_regulator(-0.055, -0.01, 0, 0)
 # PID_speed = PID_regulator(0.00045, -0.0001, 0, 120000)
-PID_yaw = PID_regulator(-0.055, 0, 0, 0)
-PID_speed = PID_regulator(0.00045, 0, 0, 120000)
+PID_yaw = PID_regulator(-0.06, 0, 0, 0)
+PID_speed = PID_regulator(0.00035, 0, 0, 120000)
 
 if __name__ == '__main__':
     cntr = Point(cam.get_frame().shape[1::-1]) / 2
@@ -120,18 +122,19 @@ def run_go_to_ports(motor_left, motor_right, func_get_img=None, out_video=None):
                 contours_color_max = best_contours
                 c_area = best_area
                 print(queue_name[best_index])
-                for i, col in enumerate(queue):
-                    if best_index != i:
-                        contours, raw = getContoursColor(col, func_get_img)
-                        if contours:
-                            area = cv2.contourArea(contours[0])
-                            if area > 500:
-                                color_cntr = getCenter(contours[0])
-                                if color_cntr is not None:
-                                    asdg = best_color_cntr - color_cntr
-                                    print(asdg, queue_name[i])
-                                    if abs(asdg.x) < 30:
-                                        c_area = 0
+                if 0:
+                    for i, col in enumerate(queue):
+                        if best_index != i:
+                            contours, raw = getContoursColor(col, func_get_img)
+                            if contours:
+                                area = cv2.contourArea(contours[0])
+                                if area > 500:
+                                    color_cntr = getCenter(contours[0])
+                                    if color_cntr is not None:
+                                        asdg = best_color_cntr - color_cntr
+                                        print(asdg, queue_name[i])
+                                        if abs(asdg.x) < 30:
+                                            c_area = 0
                 # Выбранный цвет и его контуры
 
                 # print('c_area', c_area)
@@ -167,6 +170,7 @@ def run_go_to_ports(motor_left, motor_right, func_get_img=None, out_video=None):
                     # out.release()
                     # exit(0)
                 else:
+                    time.sleep(2)
                     # Достигли нужной близости к цели – удаляем цвет из очереди и выходим
                     del_index_color.append(best_index)
                     # queue.pop(best_index)
@@ -177,11 +181,11 @@ def run_go_to_ports(motor_left, motor_right, func_get_img=None, out_video=None):
                     time.sleep(3)
                     motor_left.set_motor(0)
                     motor_right.set_motor(0)
-                    if len(queue) == 0:
+                    if len(del_index_color) == 3:
                         break
             else:
                 # Если площадь мала (менее 500) – тоже вращаемся
-                speed = 30
+                speed = 25
                 reverse = abs(PID_yaw.integral_err)/PID_yaw.integral_err
                 motor_left.set_motor(speed * ((2 * int(reverse)) - 1))
                 motor_right.set_motor(speed * ((-2 * int(reverse)) + 1))

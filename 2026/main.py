@@ -9,11 +9,11 @@ cam = HardCamera()
 motor_left = HardMotor(pwm_channel=PWM_CHANNEL_2, hz=PWM_FREQ, chip=PWM_CHIP)
 motor_right = HardMotor(pwm_channel=PWM_CHANNEL_1, hz=PWM_FREQ, chip=PWM_CHIP)
 time.sleep(3)
-Yellow = {"obrez":"170","h_min":"87","s_min":"92","s_max":"255","v_min":"179","v_max":"255","h_max":"99", 'stop_area': 90000}
-Green = {"obrez":"170","h_min":"46","s_min":"114","s_max":"240","v_min":"102","v_max":"249","h_max":"76", 'stop_area': 9200}
-Red = {"obrez": "170", "h_min": "103", "s_min": "84", "s_max": "255", "v_min": "73", "v_max": "255", "h_max": "179", 'stop_area': 100000}
-Orange = {"obrez":"170","h_min":"101","s_min":"197","s_max":"255","v_min":"174","v_max":"255","h_max":"116"}
-
+Yellow = {"obrez": "170", "h_min": "87", "s_min": "92", "s_max": "255", "v_min": "179", "v_max": "255", "h_max": "99"}
+Green = {"obrez": "170", "h_min": "60", "s_min": "127", "s_max": "255", "v_min": "102", "v_max": "255", "h_max": "84"}
+Red = {"obrez": "170", "h_min": "120", "s_min": "84", "s_max": "255", "v_min": "73", "v_max": "255", "h_max": "180"}
+Orange = {"obrez": "170", "h_min": "101", "s_min": "197", "s_max": "255", "v_min": "174", "v_max": "255",
+          "h_max": "116"}
 
 queue = [Yellow, Green, Red]
 print()
@@ -71,7 +71,7 @@ def getCenter(contour):
     return None
 
 
-def rotateToColor(color, speed=20, reverse=False, duo=0):
+def rotateToColor(color, speed=30, reverse=False, duo=0):
     while True:
         contours, img = getContoursColor(color)
         out.write(cv2.drawContours(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), contours[:1 + duo], -1, (255, 0, 0), -1))
@@ -90,7 +90,34 @@ def largest_contour(mask):
     # Находим контур с максимальной площадью
     max_contour = max(contours, key=cv2.contourArea)
     return cv2.contourArea(max_contour)
+left_cntr = cntr-Point(200, 0)
 try:
+    def go_to_gate_orange_and_rotate():
+        rotateToColor(Orange, reverse=True, duo=1)
+        while 1:
+            c, raw = getContoursColor(Orange)
+            masked = cv2.drawContours(cv2.cvtColor(raw, cv2.COLOR_BGR2RGB), c[:2], -1, (255, 0, 0), -1)
+            print(len(c))
+            if len(c) >= 2 and cv2.contourArea(c[1]) > 500:
+                print(cv2.contourArea(c[1]))
+                orange_cntr = getCenter(c[0])
+                orange_cntr_2 = getCenter(c[1])
+                cv2.circle(masked, orange_cntr.to_int(), 5, (0, 255, 0), 2)
+                cv2.circle(masked, orange_cntr_2.to_int(), 5, (0, 0, 255), 2)
+                cv2.circle(masked, ((orange_cntr + orange_cntr_2) / 2).to_int(), 5, (0, 255, 255), 2)
+                out.write(masked)
+                delta_x_yaw = (cntr - ((orange_cntr + orange_cntr_2) / 2)).x
+                delta_x_speed = abs((orange_cntr - orange_cntr_2).x)
+                u = PID_yaw(delta_x_yaw * 2)
+                u_speed = PID_speed(delta_x_speed)
+                print(u, u_speed)
+                motor_left.set_motor(u_speed - u)
+                motor_right.set_motor(u_speed + u)
+            else:
+                time.sleep(2)
+                motor_left.set_motor(0)
+                motor_right.set_motor(0)
+                break
 
 
     # # Сортируем цвета по убыванию площади самого большого контура
@@ -102,34 +129,13 @@ try:
 
 
 
-    rotateToColor(Orange, reverse=True, duo=1)
-    while 1:
-        c, raw = getContoursColor(Orange)
-        masked = cv2.drawContours(cv2.cvtColor(raw, cv2.COLOR_BGR2RGB), c[:2], -1, (255, 0, 0), -1)
-        print(len(c))
-        if len(c) >= 2 and cv2.contourArea(c[1]) > 500:
-            print(cv2.contourArea(c[1]))
-            orange_cntr = getCenter(c[0])
-            orange_cntr_2 = getCenter(c[1])
-            cv2.circle(masked, orange_cntr.to_int(), 5, (0, 255, 0), 2)
-            cv2.circle(masked, orange_cntr_2.to_int(), 5, (0, 0, 255), 2)
-            cv2.circle(masked, ((orange_cntr+orange_cntr_2)/2).to_int(), 5, (0, 255, 255), 2)
-            out.write(masked)
-            delta_x_yaw = (cntr - ((orange_cntr+orange_cntr_2)/2)).x
-            delta_x_speed = abs((orange_cntr - orange_cntr_2).x)
-            u = PID_yaw(delta_x_yaw*1.5)
-            u_speed = PID_speed(delta_x_speed)
-            print(u, u_speed)
-            motor_left.set_motor(u_speed - u)
-            motor_right.set_motor(u_speed + u)
-        else:
-            time.sleep(2)
-            motor_left.set_motor(0)
-            motor_right.set_motor(0)
-            break
+    go_to_gate_orange_and_rotate()
 
     time.sleep(2)
-    go_to_ports.run_go_to_ports(motor_left, motor_right, cam.get_frame, out)
+    go_to_ports.run_go_to_ports(motor_left, motor_right, lambda: cam.get_frame(), out)
+
+    go_to_gate_orange_and_rotate()
+
     while 1:
         img = cam.get_frame()
         out.write(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
@@ -185,13 +191,13 @@ try:
 
         # Ваши расчёты
         c_area = abs(corner_points[1][0] - corner_points[0][0])
-        if c_area > 160:
+        if c_area > 130:
             time.sleep(1)
             motor_left.set_motor(0)
             motor_right.set_motor(0)
             break
-        u = PID_yaw((cntr - center).x)
-        u_speed = PID_speed(c_area)
+        u = PID_yaw((left_cntr - center).x*1.5)
+        u_speed = PID_speed(c_area*1.5)
         # print(u, u_speed)
         print(c_area)
         motor_left.set_motor(u_speed - u)
