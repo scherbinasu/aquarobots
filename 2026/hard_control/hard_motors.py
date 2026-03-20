@@ -22,13 +22,13 @@ class HardMotor(HardwarePWM):
         power_percent: от -100 до 100
         """
         # Ограничение
-        power_percent = max(-75, min(75, power_percent))
+        power_percent = max(-100, min(100, power_percent))
 
         # Преобразование процента в duty cycle
         if power_percent >= 0:
-            duty = DUTY_STOP + (power_percent / 100.0) * (DUTY_MAX - DUTY_STOP)
+            duty = DUTY_STOP + (power_percent / 135.0) * (DUTY_MAX - DUTY_STOP)
         else:
-            duty = DUTY_STOP + ((power_percent*1.35) / 100.0) * (DUTY_STOP - DUTY_MIN)
+            duty = DUTY_STOP + (power_percent / 100.0) * (DUTY_STOP - DUTY_MIN)
 
         self.pwm.change_duty_cycle(duty)
         if output:print(f"Канал {self.pwm.pwm_channel}: {power_percent:4}% -> duty {duty:.2f}%")

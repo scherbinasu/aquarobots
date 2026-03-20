@@ -2,6 +2,16 @@ import cv2
 from hard_control.hard_camera import HardCamera
 from flask import Flask, Response, render_template_string, request
 import threading, time
+import netifaces
+
+def get_ip_by_interface(ifname):
+    try:
+        addrs = netifaces.ifaddresses(ifname)
+        return addrs[netifaces.AF_INET][0]['addr']
+    except (KeyError, ValueError):
+        return None
+
+
 
 app = Flask(__name__)
 if __name__ == '__main__':
@@ -217,6 +227,10 @@ def set_params():
 
     return ('', 204)  # No content
 print(__name__)
+print('\n')
+print('мой ip в wifi:', get_ip_by_interface('wlan0'))
+print('ip сайта в wifi:', ' http://'+get_ip_by_interface('wlan0')+':5000')
+print('\n')
 if __name__ == '__main__':
 
     threading.Thread(target=capture_and_process, daemon=True).start()

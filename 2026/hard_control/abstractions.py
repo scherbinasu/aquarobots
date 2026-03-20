@@ -101,7 +101,7 @@ class Vector:
 
 class PID_regulator():
     _old_err = 0
-    _integral_err = 0
+    integral_err = 0
 
     def __init__(self, kp, ki, kd, setpoint=0):
         self.setpoint = setpoint
@@ -120,8 +120,8 @@ class PID_regulator():
             ki = self.ki
 
         err = setpoint - input
-        i = self._integral_err
-        self._integral_err += err * kp
+        i = self.integral_err
+        self.integral_err += err * kp
         d = err - self._old_err
         self._old_err = err
         return err * kp + d * kd + i * ki

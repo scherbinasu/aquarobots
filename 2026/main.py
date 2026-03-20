@@ -1,4 +1,5 @@
 import cv2
+import go_to_ports
 
 from hard_control.abstractions import *
 from hard_control.hard_camera import *
@@ -128,60 +129,7 @@ try:
             break
 
     time.sleep(2)
-    def run_port(func_cam, motor_left, motor_right, queue_sorted, PID_yaw, PID_speed):
-
-        for i in range(len(queue_sorted)):
-            color = queue_sorted[i]
-            c_area = 0
-            motor_left.set_motor(0)
-            motor_right.set_motor(0)
-            while True:
-                img = func_cam()
-                hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-                mask = inRangeF(hsv, color)
-                contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-                contours = sorted(contours, key=cv2.contourArea, reverse=True)
-                out.write(cv2.drawContours(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), contours[:2], -1, (0, 255, 0), -1))
-                if len(contours) >= 1 and cv2.contourArea(contours[0]) > 6000: break
-                motor_left.set_motor(-20)
-                motor_right.set_motor(20)
-            while c_area <= color['stop_area']:
-                img = func_cam()
-                hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-                mask = inRangeF(hsv, color)
-                contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-                contours = sorted(contours, key=cv2.contourArea, reverse=True)
-                print('contours', len(contours))
-                if len(contours) >= 1:
-                    c_area = cv2.contourArea(contours[0])
-                    print('c area', c_area)
-                    if c_area > 1000:
-                        # br = np.zeros(mask.shape)
-                        # br = cv2.drawContours(br, contours[0], -1, 255, cv2.FILLED)
-                        m = cv2.moments(contours[0])
-                        if m['m00'] > 0:
-                            masked = img
-                            color_cntr = Point((m["m10"] / m["m00"], m["m01"] / m["m00"]))
-                            cv2.circle(masked, color_cntr.to_int(), 5, (0, 0, 255), cv2.FILLED)
-                            cv2.circle(masked, cntr.to_int(), 10, (255, 0, 0), cv2.FILLED)
-                            delta_x = (cntr - color_cntr).x
-                            u = PID_yaw(delta_x)
-                            u_speed = PID_speed(c_area)
-                            motor_left.set_motor(u_speed - u)
-                            motor_right.set_motor(u_speed + u)
-                            print('speed, yaw, delta', u_speed, u, delta_x)
-                            out.write(
-                                cv2.drawContours(cv2.cvtColor(masked, cv2.COLOR_BGR2RGB), contours[:2], -1, (0, 255, 0), -1))
-                    else:
-                        break
-            time.sleep(2)
-            motor_left.set_motor(-35)
-            motor_right.set_motor(-35)
-            time.sleep(1)
-            motor_left.set_motor(0)
-            motor_right.set_motor(0)
-            time.sleep(1)
-    run_port(cam.get_frame, motor_left, motor_right, queue_sorted, PID_yaw, PID_speed)
+    go_to_ports.run_go_to_ports(motor_left, motor_right, cam.get_frame, out)
     while 1:
         img = cam.get_frame()
         out.write(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
