@@ -22,7 +22,7 @@ class HardMotor(HardwarePWM):
         power_percent: от -100 до 100
         """
         # Ограничение
-        power_percent = max(-100, min(100, power_percent))
+        power_percent = max(-100, min(100, -power_percent))
 
         # Преобразование процента в duty cycle
         if power_percent >= 0:

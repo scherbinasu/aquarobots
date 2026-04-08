@@ -1,5 +1,6 @@
 import traceback
-
+import cv2
+import time
 from hard_control.abstractions import *
 
 if __name__ == '__main__':
@@ -12,11 +13,18 @@ if __name__ == '__main__':
     time.sleep(3)
 else:
     import cv2, time
-Yellow = {"obrez": "170", "h_min": "87", "s_min": "92", "s_max": "255", "v_min": "179", "v_max": "255", "h_max": "99"}
-Green = {"obrez": "170", "h_min": "60", "s_min": "127", "s_max": "255", "v_min": "102", "v_max": "255", "h_max": "84"}
-Red = {"obrez": "170", "h_min": "120", "s_min": "84", "s_max": "255", "v_min": "73", "v_max": "255", "h_max": "180"}
-Orange = {"obrez": "170", "h_min": "101", "s_min": "197", "s_max": "255", "v_min": "174", "v_max": "255",
+if __name__ == '__main__':
+    Yellow = {"obrez": "170", "h_min": "87", "s_min": "92", "s_max": "255", "v_min": "179", "v_max": "255", "h_max": "99"}
+    Green = {"obrez": "170", "h_min": "60", "s_min": "127", "s_max": "255", "v_min": "102", "v_max": "255", "h_max": "84"}
+    Red = {"obrez": "170", "h_min": "120", "s_min": "84", "s_max": "255", "v_min": "73", "v_max": "255", "h_max": "180"}
+    Orange = {"obrez": "170", "h_min": "101", "s_min": "197", "s_max": "255", "v_min": "174", "v_max": "255",
           "h_max": "116"}
+else:
+    import colors
+    Yellow = colors.Yellow
+    Green = colors.Green
+    Red = colors.Red
+    Orange = colors.Orange
 del_index_color = []
 queue = [Yellow, Green, Red]
 all_color = [Yellow, Green, Red]
@@ -26,7 +34,11 @@ min_y_point_contour = 0
 # PID_speed = PID_regulator(0.00045, -0.0001, 0, 120000)
 PID_yaw = PID_regulator(-0.06, 0, 0, 0)
 PID_speed = PID_regulator(0.00035, 0, 0, 120000)
-
+def video_sleep(sleep_time, out, FPS, get_img):
+    time_start = time.time()
+    while time_start+sleep_time > time.time():
+        time.sleep(1 / FPS)
+        out.write(get_img())
 if __name__ == '__main__':
     cntr = Point(cam.get_frame().shape[1::-1]) / 2
     OUTPUT_FILE = "output.mp4"  # имя выходного файла
@@ -93,7 +105,8 @@ def largest_contour(mask):
     max_contour = max(contours, key=cv2.contourArea)
     return cv2.contourArea(max_contour)
 
-def run_go_to_ports(motor_left, motor_right, func_get_img=None, out_video=None):
+def run_go_to_ports(motor_left, motor_right, func_get_img=None, out_video=None, fps=30):
+    video_sleep(2, out_video, fps, func_get_img)
     try:
         cntr = Point(func_get_img().shape[1::-1]) / 2
         while True:
@@ -170,15 +183,16 @@ def run_go_to_ports(motor_left, motor_right, func_get_img=None, out_video=None):
                     # out.release()
                     # exit(0)
                 else:
-                    time.sleep(2)
+                    video_sleep(2, out_video, fps, func_get_img)
                     # Достигли нужной близости к цели – удаляем цвет из очереди и выходим
                     del_index_color.append(best_index)
                     # queue.pop(best_index)
-                    motor_left.set_motor(-35 + u*3)
+                    motor_left.set_motor(-35 +  u*3)
                     motor_right.set_motor(-35 - u*3)
                     print(PID_speed.integral_err)
                     print(PID_yaw.integral_err)
-                    time.sleep(3)
+                    if len(del_index_color) == 3:video_sleep(1, out_video, fps, func_get_img)
+                    else:video_sleep(3, out_video, fps, func_get_img)
                     motor_left.set_motor(0)
                     motor_right.set_motor(0)
                     if len(del_index_color) == 3:
@@ -186,10 +200,10 @@ def run_go_to_ports(motor_left, motor_right, func_get_img=None, out_video=None):
             else:
                 # Если площадь мала (менее 500) – тоже вращаемся
                 speed = 25
-                reverse = abs(PID_yaw.integral_err)/PID_yaw.integral_err
+                reverse = -1 if PID_yaw.integral_err <= 0 else 1
                 motor_left.set_motor(speed * ((2 * int(reverse)) - 1))
                 motor_right.set_motor(speed * ((-2 * int(reverse)) + 1))
-    except Exception as e:
+    except:
         print("Произошла ошибка:")
         traceback.print_exc()
 
@@ -197,7 +211,7 @@ def run_go_to_ports(motor_left, motor_right, func_get_img=None, out_video=None):
 if __name__ == '__main__':
     try:
         run_go_to_ports(motor_left, motor_right, cam.get_frame, out)
-    except Exception as e:
+    except:
         traceback.print_exc()
     motor_left.set_motor(0)
     motor_right.set_motor(0)

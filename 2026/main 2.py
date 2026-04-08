@@ -37,7 +37,7 @@ try:
     PID_yaw = PID_regulator(-0.04, 0, 0, 0)
     PID_speed = PID_regulator(0.0004, 0, 0, 90000)
 
-    detector = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100),
+    detector = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000),
                                        cv2.aruco.DetectorParameters())
 
     OUTPUT_FILE = "output.mp4"      # имя выходного файла
@@ -146,12 +146,17 @@ try:
 
 
 
-    go_to_gate_orange_and_rotate()
+    # go_to_gate_orange_and_rotate()
     # out.release()
     # video_sleep(2, out, FPS, lambda: cam.get_frame())
+    motor_left.set_motor(50)
+    motor_right.set_motor(50)
+    video_sleep(3, out, FPS, lambda: cam.get_frame())
+    motor_left.set_motor(0)
+    motor_right.set_motor(0)
     go_to_ports.run_go_to_ports(motor_left, motor_right, lambda: cam.get_frame(), out, FPS)
 
-    go_to_gate_orange_and_rotate()
+    # go_to_gate_orange_and_rotate()
 
     while 1:
         img = cam.get_frame()
