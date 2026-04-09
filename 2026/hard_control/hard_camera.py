@@ -1,7 +1,5 @@
 import cv2
 from picamera2 import Picamera2
-import cv2
-from picamera2 import Picamera2
 
 class HardCamera:
     def __init__(self, size=(820, 616)):

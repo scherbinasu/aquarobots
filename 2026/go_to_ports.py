@@ -1,7 +1,8 @@
 import traceback
 import cv2
 import time
-from hard_control.abstractions import *
+# from hard_control.abstractions import *
+from bestMaskMetod import *
 
 if __name__ == '__main__':
     from hard_control.hard_camera import *
@@ -62,19 +63,18 @@ def inRangeF(img, color):
     return masked
 
 
-def getContoursColor(color, func_get_img=None):
-    if func_get_img is None:
-        raw = cam.get_frame()
-    else:
-        raw = func_get_img()
-    hsv = cv2.cvtColor(raw, cv2.COLOR_BGR2HSV)
-    mask = inRangeF(hsv, color)
-    # print(type(mask))
-    contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-    # print(type(contours))
-    contours = sorted(contours, key=cv2.contourArea, reverse=True)
-    # print(len(contours))
-    return contours, raw
+def getContoursColor(color, func_get_img):
+        if func_get_img is None:
+            raw = cam.get_frame()
+        else:
+            raw = func_get_img()
+        hsv = cv2.cvtColor(raw, cv2.COLOR_BGR2HSV)
+        mask = inRangeF(hsv, color)
+        # print(type(mask))
+        contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        c = [i for i in contours if color['min_compactness'] < compactness(i) < color['max_compactness']]
+        # c = [i for i in c if color['min_compactness'] < compactness(i) < color['max_compactness']]
+        return c
 
 
 def getCenter(contour):
@@ -85,16 +85,7 @@ def getCenter(contour):
     return None
 
 
-def rotateToColor(color, speed=30, reverse=False, duo=0):
-    while True:
-        contours, img = getContoursColor(color)
-        out.write(cv2.drawContours(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), contours[:1 + duo], -1, (255, 0, 0), -1))
-        if len(contours) >= 1 + duo and cv2.contourArea(contours[0 + duo]) > 500:
-            motor_left.set_motor(0)
-            motor_right.set_motor(0)
-            break
-        motor_left.set_motor(speed * ((2 * int(reverse)) - 1))
-        motor_right.set_motor(speed * ((-2 * int(reverse)) + 1))
+
 
 
 def largest_contour(mask):
