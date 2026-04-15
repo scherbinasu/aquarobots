@@ -15,22 +15,9 @@ try:
     mv(50, 50, 5)
     # input("Press Enter to continue...")
     mv(50, 50, 5)
-    if 0:
-        mv(-30, -30, 2)
-        mv(30, -30, 2)
-        mv(30, 30, 3)
-        mv(-30, -30, 5)
-        mv(30, 30, 3)
-        mv(30, -30, 2.5)
-        mv(100, 100, 10)
-    else:
-        time_start = time.time()
-        while time_start+300 > time.time():
-            mv(random.randint(-10, 10)*10, random.randint(-10, 10)*10, random.randint(10, 50)/10)
-
-
-
-
+    time_start = time.time()
+    while time_start+300 > time.time():
+        mv(random.randint(-10, 10)*10, random.randint(-10, 10)*10, random.randint(10, 50)/10)
 except:
     traceback.print_exc()
 stop()

@@ -3,27 +3,20 @@ try:
     import cv2
     import go_to_ports
     import traceback
-
     from hard_control.abstractions import *
     from hard_control.hard_camera import *
     from hard_control.hard_motors import *
     import numpy as np
+    import colors
+    Yellow = colors.Yellow
+    Green = colors.Green
+    Red = colors.Red
+    Orange = colors.Orange
     cam = HardCamera()
     motor_left = HardMotor(pwm_channel=PWM_CHANNEL_1, hz=PWM_FREQ, chip=PWM_CHIP)
     motor_right = HardMotor(pwm_channel=PWM_CHANNEL_2, hz=PWM_FREQ, chip=PWM_CHIP)
     time.sleep(3)
-    if __name__ != '__main__':
-        Yellow = {"obrez": "170", "h_min": "87", "s_min": "92", "s_max": "255", "v_min": "179", "v_max": "255", "h_max": "99"}
-        Green = {"obrez": "170", "h_min": "60", "s_min": "127", "s_max": "255", "v_min": "102", "v_max": "255", "h_max": "84"}
-        Red = {"obrez": "170", "h_min": "120", "s_min": "84", "s_max": "255", "v_min": "73", "v_max": "255", "h_max": "180"}
-        Orange = {"obrez": "170", "h_min": "101", "s_min": "197", "s_max": "255", "v_min": "174", "v_max": "255",
-              "h_max": "116"}
-    else:
-        import colors
-        Yellow = colors.Yellow
-        Green = colors.Green
-        Red = colors.Red
-        Orange = colors.Orange
+
 
     queue = [Yellow, Green, Red]
     print()
