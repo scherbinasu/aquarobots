@@ -13,20 +13,23 @@ DUTY_MIN = 5.0             # 1000 мкс → 5%
 DUTY_STOP = 7.5            # 1500 мкс → 7.5%
 DUTY_MAX = 10.0            # 2000 мкс → 10%
 class HardMotor(HardwarePWM):
+    reversed = False
+    cor_kf = 1 # коэффициент до множения скорости мотора
+    just_kf = 1.35 # пропорция между скорость вперёд и назад (скорость вперёд/скорость назад)
     def __init__(self, *args, **kw):
         self.pwm = HardwarePWM(*args, **kw)
+    def start(self):
         self.pwm.start(DUTY_STOP)
-
     def set_motor(self, power_percent, output=False):
         """
         power_percent: от -100 до 100
         """
         # Ограничение
-        power_percent = max(-100, min(100, -power_percent))
+        power_percent = max(-100, min(100, (power_percent*self.cor_kf)*((2*int(self.reversed))-1)))
 
         # Преобразование процента в duty cycle
         if power_percent >= 0:
-            duty = DUTY_STOP + (power_percent / 135.0) * (DUTY_MAX - DUTY_STOP)
+            duty = DUTY_STOP + (power_percent / (100.0*self.just_kf)) * (DUTY_MAX - DUTY_STOP)
         else:
             duty = DUTY_STOP + (power_percent / 100.0) * (DUTY_STOP - DUTY_MIN)
 
