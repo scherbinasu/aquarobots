@@ -11,19 +11,25 @@ import control.web.webGUI as webGUI
 import time
 
 
-class Aquarobot():
-    def __init__(self):
-        self.camera = camera.HardCamera()
+class AquaRobot:
+    def __init__(self, sizeFrame=(820, 616)):
+        self.video = None
+        self.sizeFrame = sizeFrame
+        self.camera = camera.HardCamera(sizeFrame)
         self.motor_left = motors.HardMotor(pwm_channel=motors.PWM_CHANNEL_1, hz=motors.PWM_FREQ, chip=motors.PWM_CHIP)
         self.motor_right = motors.HardMotor(pwm_channel=motors.PWM_CHANNEL_2, hz=motors.PWM_FREQ, chip=motors.PWM_CHIP)
         self.gui = webGUI.WebGUI()
 
-    def start(self):
+    def start(self, cv2=None, FPS=30, OUTPUT_FILE="output.mp4"):
         self.camera.start()
         self.motor_left.start()
         self.motor_right.start()
         self.gui.start()
         time.sleep(3)
+        if not cv2 is None and not self.video is None:
+            self.FPS = FPS
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            self.video = cv2.VideoWriter(OUTPUT_FILE, fourcc, self.FPS, self.sizeFrame)
 
     def stop(self):
         self.camera.release()
@@ -31,6 +37,11 @@ class Aquarobot():
         self.motor_right.stop()
         self.gui.destroyAllWindows()
 
+    def sleepV(self, sleep_time):
+        time_start = time.time()
+        while time_start + sleep_time > time.time():
+            self.video.write(self.camera.get_frame())
+            time.sleep(1 / self.FPS)
 
 class Drone:
     def __init__(self):

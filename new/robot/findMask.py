@@ -1,74 +1,88 @@
 import cv2
-from control.camera.camera import HardCamera
-from control.web.webGUI import WebGUI
+import numpy as np
+import math
+from control.abstractions import *
 
-def main():
-    # 1. Камера
-    cap = HardCamera(size=(820, 616))
-    cap.start()
 
-    # 2. Веб-интерфейс
-    gui = WebGUI(host='0.0.0.0', port=5000)
 
-    # 3. Параметры HSV
-    hsv_min = [0, 0, 0]
-    hsv_max = [180, 255, 255]
-    obrez = 0
 
-    # 4. Колбэки для трекбаров
-    def on_h_min(val): hsv_min[0] = val
-    def on_h_max(val): hsv_max[0] = val
-    def on_s_min(val): hsv_min[1] = val
-    def on_s_max(val): hsv_max[1] = val
-    def on_v_min(val): hsv_min[2] = val
-    def on_v_max(val): hsv_max[2] = val
-    def on_obrez(val):
-        nonlocal obrez
-        obrez = val
+class FindMask:
+    def __init__(self, frame=None, contours = None, color = None):
+        self.frame = frame
+        self.contours = contours
+        self.color = color
+        self.cntr_frame = Point(frame.shape[1::-1]) / 2
+        self.zeros_frame = np.zeros(frame.shape, np.uint8)
+        self.zeros_bit = np.zeros([frame.shape[0], frame.shape[1], 1], np.uint8)
 
-    # Создаём трекбары
-    gui.createTrackbar("H Min", "control", 0, 180, on_h_min)
-    gui.createTrackbar("H Max", "control", 180, 180, on_h_max)
-    gui.createTrackbar("S Min", "control", 0, 255, on_s_min)
-    gui.createTrackbar("S Max", "control", 255, 255, on_s_max)
-    gui.createTrackbar("V Min", "control", 0, 255, on_v_min)
-    gui.createTrackbar("V Max", "control", 255, 255, on_v_max)
-    gui.createTrackbar("Obrez", "control", 0, 480, on_obrez)
+    def normalize(self):
+        self.frame = cv2.normalize(self.frame, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+        return
 
-    # 5. Детектор ArUco
-    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000)
-    params = cv2.aruco.DetectorParameters()
-    detector = cv2.aruco.ArucoDetector(aruco_dict, params)
+    def compactness(self):
+        a = []
+        for c in self.contours:
+            area = cv2.contourArea(c)
+            perimeter = cv2.arcLength(c, True)
+            if perimeter == 0 or area == 0:
+                return 0
+            compactness = (4 * math.pi * area) / (perimeter * perimeter)
+            a.append(compactness)
+        return a
 
-    print("Сервер запущен. Откройте в браузере: http://<IP-адрес>:5000")
+    def approx(self, k=0.02):
+        a = []
+        for cnt in self.contours:
+            perimeter = cv2.arcLength(cnt, True)
+            epsilon = perimeter * k
+            approx_cnt = cv2.approxPolyDP(cnt, epsilon, True)
+            a.append(approx_cnt)
+        self.contours = np.array(a)
+        return approx_cnt
 
-    while True:
-        frame = cap.get_frame()      # BGR
-        if frame is None:
-            continue
+    def HSV2Gray(self, Hk, Sk, Vk):
+        img = self.frame
+        h = img[:, :, 0].astype(np.float32)
+        s = img[:, :, 1].astype(np.float32)
+        v = img[:, :, 2].astype(np.float32)
+        gray_float = (h * Hk) / 3 + (s * Sk) / 3 + (v * Vk) / 3
+        gray = np.clip(gray_float, 0, 255).astype(np.uint8)
+        self.frame = gray
+        return gray
 
-        # Создаём маску
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        lower = tuple(hsv_min)
-        upper = tuple(hsv_max)
-        mask = cv2.inRange(hsv, lower, upper)
-        mask[:obrez, :] = 0
+    def getCenter(self):
+        a = []
+        for contour in self.contours:
+            m = cv2.moments(contour)
+            if m['m00'] > 0:
+                color_cntr = Point((m["m10"] / m["m00"], m["m01"] / m["m00"]))
+                a.append(color_cntr)
+        return a
 
-        # Детекция ArUco на исходном кадре
-        corners, ids, _ = detector.detectMarkers(frame)
-        if ids is not None:
-            cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+    def inRangeF(self, color=None):
+        """Возвращает бинарную маску для заданного цвета."""
+        try:
+            img = self.frame
+            lower = (int(color['h_min']), int(color['s_min']), int(color['v_min']))
+            upper = (int(color['h_max']), int(color['s_max']), int(color['v_max']))
+            masked = cv2.inRange(img, lower, upper)
+            # Обрезка верхней части
+            obrez = int(color['obrez'])
+            if obrez > 0:
+                masked[:obrez, :] = 0
+            self.frame = masked
+            return masked
+        except:
+            self.frame = self.zeros_bit.copy()
+            return self.frame
 
-        # Отображаем два окна
-        gui.imshow("raw", frame)          # окно с именем "raw"
-        gui.imshow("masked", mask)        # окно с именем "masked"
+    def sortedContours(self):
+        contours = sorted(self.contours, key=cv2.contourArea, reverse=True)
+        self.contours = contours
+        return contours
 
-        # Задержка для управления частотой кадров (имитация waitKey)
-        if gui.waitKey(30) == ord('q'):   # всегда -1, но оставляем для совместимости
-            break
+    def findContours(self):
 
-    cap.release()
-    gui.destroyAllWindows()
-
-if __name__ == '__main__':
-    main()
+        contours, _ = cv2.findContours(self.frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        self.contours = contours
+        return contours

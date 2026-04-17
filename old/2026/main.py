@@ -82,16 +82,7 @@ try:
         return None
 
 
-    def rotateToColor(color, speed=30, reverse=False, duo=0):
-        while True:
-            contours, img = getContoursColor(color)
-            out.write(cv2.drawContours(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), contours[:1 + duo], -1, (255, 0, 0), -1))
-            if len(contours) >= 1 + duo and cv2.contourArea(contours[0 + duo]) > 500:
-                motor_left.set_motor(0)
-                motor_right.set_motor(0)
-                break
-            motor_left.set_motor(speed * ((2 * int(reverse)) - 1))
-            motor_right.set_motor(speed * ((-2 * int(reverse)) + 1))
+
 
 
     def largest_contour(mask):
@@ -103,7 +94,15 @@ try:
         return cv2.contourArea(max_contour)
     left_cntr = cntr-Point(200, 0)
     def go_to_gate_orange_and_rotate():
-        rotateToColor(Orange, reverse=False, duo=1)
+        while True:
+            contours, img = getContoursColor(Orange)
+            out.write(cv2.drawContours(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), contours[:1 + duo], -1, (255, 0, 0), -1))
+            if len(contours) >= 1 + 1 and cv2.contourArea(contours[0 + 1]) > 500:
+                motor_left.set_motor(0)
+                motor_right.set_motor(0)
+                break
+            motor_left.set_motor(30 * ((2 * int(False)) - 1))
+            motor_right.set_motor(30 * ((-2 * int(False)) + 1))
         while 1:
             c, raw = getContoursColor(Orange)
             masked = cv2.drawContours(cv2.cvtColor(raw, cv2.COLOR_BGR2RGB), c[:2], -1, (255, 0, 0), -1)
