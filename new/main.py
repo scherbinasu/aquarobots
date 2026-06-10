@@ -3,7 +3,7 @@ from robot.findMask import *
 from robot.robot import AquaRobot
 try:
     aquaRobot = AquaRobot()
-
+    aquaRobot.start(cv2=cv2)
     Yellow = colors.Yellow
     Green = colors.Green
     Red = colors.Red
@@ -22,13 +22,14 @@ try:
     # поворот к воротам
     while True:
         img = aquaRobot.camera.get_frame()
+        aquaRobot.gui.imshow('img', img)
         mask = FindMask(img)
         mask.normalize()
         mask.inRangeF(Orange)
         mask.findContours()
         mask.sortedContours()
         contours = mask.contours
-        aquaRobot.video.write(cv2.drawContours(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), contours[:1 + 1], -1, (255, 0, 0), -1))
+        aquaRobot.video.write(cv2.drawContours(img, contours[:2], -1, (255, 0, 0), -1))
         if len(contours) >= 1 + 1 and cv2.contourArea(contours[0 + 1]) > 500:
             aquaRobot.motor_left.set_motor(0)
             aquaRobot.motor_right.set_motor(0)

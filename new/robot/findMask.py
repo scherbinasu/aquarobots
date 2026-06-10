@@ -1,3 +1,8 @@
+import asyncio
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent))
 import cv2
 import numpy as np
 import math

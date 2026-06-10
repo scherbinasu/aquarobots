@@ -39,7 +39,7 @@ def main():
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000)
     params = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(aruco_dict, params)
-
+    gui.start()
     print("Сервер запущен. Откройте в браузере: http://<IP-адрес>:5000")
 
     while True:

@@ -21,9 +21,25 @@ class WebGUI:
         self._server_thread = threading.Thread(target=self._run_server, daemon=True)
         self._server_thread.start()
         time.sleep(0.5)  # даём время на запуск
+        try:
+            import netifaces
+
+            def get_ip_by_interface(ifname):
+                try:
+                    addrs = netifaces.ifaddresses(ifname)
+                    return addrs[netifaces.AF_INET][0]['addr']
+                except (KeyError, ValueError):
+                    return '127.0.0.1'
+
+            print('http://' + get_ip_by_interface('eth0') + ':' + str(self.port))
+            print('http://' + get_ip_by_interface('wlan0') + ':' + str(self.port))
+        except:
+            print('err')
+
 
     def _run_server(self):
         self.app.run(host=self.host, port=self.port, debug=False, threaded=True)
+
 
     def _setup_routes(self):
         @self.app.route('/')
