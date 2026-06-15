@@ -10,7 +10,8 @@ if [ "$EUID" -ne 0 ]; then
     exec sudo "$0" "$@"
     exit
 fi
-
+apt upgrade
+apt install python3-lgpio
 # Find config.txt
 CONFIG_FILE=""
 for candidate in /boot/config.txt /boot/firmware/config.txt; do
