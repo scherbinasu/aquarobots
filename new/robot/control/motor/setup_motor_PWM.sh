@@ -14,7 +14,7 @@ apt upgrade
 apt install python3-lgpio
 # Find config.txt
 CONFIG_FILE=""
-for candidate in /boot/config.txt /boot/firmware/config.txt; do
+for candidate in /boot/firmware/config.txt /boot/config.txt; do
     if [ -f "$candidate" ]; then
         CONFIG_FILE="$candidate"
         break
