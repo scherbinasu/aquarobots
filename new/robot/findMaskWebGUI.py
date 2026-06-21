@@ -1,5 +1,6 @@
 import cv2
 from control.camera.camera import HardCamera
+from findMask import *
 from control.web.webGUI import WebGUI
 
 def main():
@@ -11,20 +12,17 @@ def main():
     gui = WebGUI(host='0.0.0.0', port=5000)
 
     # 3. Параметры HSV
-    hsv_min = [0, 0, 0]
-    hsv_max = [180, 255, 255]
-    obrez = 0
+    col = {"obrez": "0", "h_min": "0", "s_min": "0", "s_max": "255", "v_min": "0", "v_max": "255", "h_max": "255"}
+    col = {"obrez": "190", "h_min": "8", "s_min": "184", "s_max": "255", "v_min": "41", "v_max": "255", "h_max": "30"}
 
     # 4. Колбэки для трекбаров
-    def on_h_min(val): hsv_min[0] = val
-    def on_h_max(val): hsv_max[0] = val
-    def on_s_min(val): hsv_min[1] = val
-    def on_s_max(val): hsv_max[1] = val
-    def on_v_min(val): hsv_min[2] = val
-    def on_v_max(val): hsv_max[2] = val
-    def on_obrez(val):
-        nonlocal obrez
-        obrez = val
+    def on_h_min(val): col["h_min"] = val
+    def on_h_max(val): col["h_max"] = val
+    def on_s_min(val): col["s_min"] = val
+    def on_s_max(val): col["s_max"] = val
+    def on_v_min(val): col["v_min"] = val
+    def on_v_max(val): col["v_max"] = val
+    def on_obrez(val): col["obrez"] = val
 
     # Создаём трекбары
     gui.createTrackbar("H Min", "control", 0, 180, on_h_min)
@@ -48,11 +46,9 @@ def main():
             continue
 
         # Создаём маску
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        lower = tuple(hsv_min)
-        upper = tuple(hsv_max)
-        mask = cv2.inRange(hsv, lower, upper)
-        mask[:obrez, :] = 0
+        mask = FindMask(frame)
+        # mask.normalize()
+        mask.inRangeF(col)
 
         # Детекция ArUco на исходном кадре
         corners, ids, _ = detector.detectMarkers(frame)
@@ -61,7 +57,7 @@ def main():
 
         # Отображаем два окна
         gui.imshow("raw", frame)          # окно с именем "raw"
-        gui.imshow("masked", mask)        # окно с именем "masked"
+        gui.imshow("masked", mask.frame)        # окно с именем "masked"
 
         # Задержка для управления частотой кадров (имитация waitKey)
         if gui.waitKey(30) == ord('q'):   # всегда -1, но оставляем для совместимости

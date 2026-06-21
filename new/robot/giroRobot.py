@@ -1,11 +1,11 @@
 import asyncio
 import sys
 from pathlib import Path
-
 sys.path.append(str(Path(__file__).parent))
 import control.camera.camera as camera
 import control.motor.motors as motors
 import control.web.webGUI as webGUI
+import control.gyroscope.gyroscope as gyroscope
 import time
 
 
@@ -17,6 +17,8 @@ class AquaRobot:
         self.motor_left = motors.HardMotor(pwm_channel=motors.PWM_CHANNEL_1, hz=motors.PWM_FREQ, chip=motors.PWM_CHIP)
         self.motor_right = motors.HardMotor(pwm_channel=motors.PWM_CHANNEL_2, hz=motors.PWM_FREQ, chip=motors.PWM_CHIP)
         self.gui = webGUI.WebGUI()
+        self.giro = gyroscope.Gyroscope()
+        self.giro.reboot()
 
     def start(self, cv2=None, FPS=30, OUTPUT_FILE="output.mp4"):
         self.camera.start()
@@ -34,6 +36,7 @@ class AquaRobot:
         self.motor_left.stop()
         self.motor_right.stop()
         self.gui.destroyAllWindows()
+        self.giro.stop()
     def __del__(self):
         self.stop()
 

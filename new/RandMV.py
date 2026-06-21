@@ -2,11 +2,13 @@ from robot.control.motor.motors import *
 import traceback, random
 motor_left = HardMotor(pwm_channel=PWM_CHANNEL_1, hz=PWM_FREQ, chip=PWM_CHIP)
 motor_right = HardMotor(pwm_channel=PWM_CHANNEL_2, hz=PWM_FREQ, chip=PWM_CHIP)
+motor_left.start()
+motor_right.start()
 time.sleep(3)
 def mv(speed_left, speed_right, delay):
     print("Motor started", speed_left, speed_right, delay)
-    motor_left.set_motor(-speed_left*1.25)
-    motor_right.set_motor(-speed_right)
+    motor_left.set_motor(speed_left*1.25)
+    motor_right.set_motor(speed_right)
     time.sleep(delay)
 def stop():
     motor_left.stop()

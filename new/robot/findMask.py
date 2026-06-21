@@ -16,9 +16,10 @@ class FindMask:
         self.frame = frame
         self.contours = contours
         self.color = color
-        self.cntr_frame = Point(frame.shape[1::-1]) / 2
-        self.zeros_frame = np.zeros(frame.shape, np.uint8)
-        self.zeros_bit = np.zeros([frame.shape[0], frame.shape[1], 1], np.uint8)
+        if frame is not None:
+            self.cntr_frame = Point(frame.shape[1::-1]) / 2
+            self.zeros_frame = np.zeros(frame.shape, np.uint8)
+            self.zeros_bit = np.zeros([frame.shape[0], frame.shape[1], 1], np.uint8)
 
     def normalize(self):
         self.frame = cv2.normalize(self.frame, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
@@ -70,7 +71,7 @@ class FindMask:
             img = self.frame
             lower = (int(color['h_min']), int(color['s_min']), int(color['v_min']))
             upper = (int(color['h_max']), int(color['s_max']), int(color['v_max']))
-            masked = cv2.inRange(img, lower, upper)
+            masked = cv2.inRange(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), lower, upper)
             # Обрезка верхней части
             obrez = int(color['obrez'])
             if obrez > 0:
