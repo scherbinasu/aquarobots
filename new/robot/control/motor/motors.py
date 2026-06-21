@@ -1,121 +1,107 @@
-from rpi_hardware_pwm import HardwarePWM
+import lgpio
 import time
 import sys
 
 # --- Настройки ---
-PWM_CHIP = 0               # для Raspberry Pi 4 и более старых версий
-PWM_CHANNEL_1 = 0          # соответствует GPIO 12
-PWM_CHANNEL_2 = 1          # соответствует GPIO 13
-PWM_FREQ = 50              # частота 50 Гц
+PWM_FREQ = 50                 # 50 Гц
+PERIOD_NS = int(1e9 / PWM_FREQ)  # 20 000 000 нс (20 мс)
+PWM_CHANNEL_1 = 0    # соответствует GPIO 12
+PWM_CHANNEL_2 = 1    # соответствует GPIO 13
+PWM_FREQ = 50
+PWM_CHIP = 0
 
-# Соответствие duty cycle ширине импульса при 50 Гц (период = 20000 мкс)
-DUTY_MIN = 5.0             # 1000 мкс → 5%
-DUTY_STOP = 7.5            # 1500 мкс → 7.5%
-DUTY_MAX = 10.0            # 2000 мкс → 10%
-class HardMotor(HardwarePWM):
+
+# Длительности импульсов в наносекундах
+PULSE_MIN_NS = 1_000_000      # 1 мс   -> назад
+PULSE_STOP_NS = 1_500_000     # 1.5 мс -> стоп
+PULSE_MAX_NS = 2_000_000      # 2 мс   -> вперёд
+
+# Отображение логического канала на номер GPIO (BCM)
+# По умолчанию: канал 0 = GPIO12, канал 1 = GPIO13
+CHANNEL_TO_GPIO = {
+    0: 12,
+    1: 13,
+}
+
+class HardMotor:
+    """Управление мотором (ESC) через аппаратный ШИМ на lgpio."""
     reversed = False
-    cor_kf = 1 # коэффициент до множения скорости мотора
-    just_kf = 1.35 # пропорция между скорость вперёд и назад (скорость вперёд/скорость назад)
-    def __init__(self, *args, **kw):
-        self.pwm = HardwarePWM(*args, **kw)
+    cor_kf = 1          # коэффициент умножения скорости
+    just_kf = 1.35      # пропорция вперёд/назад (для компенсации разницы)
+
+    def __init__(self, pwm_channel, hz=PWM_FREQ, chip=0):
+        """
+        pwm_channel: 0 (GPIO12) или 1 (GPIO13)
+        hz: частота (по умолч. 50)
+        chip: номер gpiochip (обычно 0)
+        """
+        self.pwm_channel = pwm_channel
+        self.gpio_pin = CHANNEL_TO_GPIO.get(pwm_channel)
+        if self.gpio_pin is None:
+            raise ValueError(f"Неверный канал: {pwm_channel}. Допустимо 0 или 1.")
+        self.freq = hz
+        self.chip = chip
+        self.handle = None
+        self._is_setup = False
+        self._init_pwm()
+
+    def _init_pwm(self):
+        """Открыть gpiochip и захватить пин как выход для ШИМ."""
+        try:
+            self.handle = lgpio.gpiochip_open(self.chip)
+            # Освободить пин, если он уже был занят (игнорируем ошибку)
+            try:
+                lgpio.gpio_free(self.handle, self.gpio_pin)
+            except lgpio.error:
+                pass
+            lgpio.gpio_claim_output(self.handle, self.gpio_pin)
+            self._is_setup = True
+        except Exception as e:
+            raise RuntimeError(f"Не удалось инициализировать GPIO {self.gpio_pin}: {e}")
+
     def start(self):
-        self.pwm.start(DUTY_STOP)
+        """Установить мотор в нейтраль (стоп)."""
+        self.set_motor(0)
+
     def set_motor(self, power_percent, output=False):
         """
-        power_percent: от -100 до 100
+        power_percent: от -100 до 100.
+        output: если True, печатать отладочную информацию.
         """
-        # Ограничение
-        power_percent = max(-100, min(100, (power_percent*self.cor_kf)*((2*int(self.reversed))-1)))
+        if not self._is_setup:
+            self._init_pwm()
 
-        # Преобразование процента в duty cycle
-        if power_percent >= 0:
-            duty = DUTY_STOP + (power_percent / (100.0*self.just_kf)) * (DUTY_MAX - DUTY_STOP)
+        # Ограничение и учёт реверса
+        p = max(-100, min(100, (power_percent * self.cor_kf) * ((2 * int(self.reversed)) - 1)))
+
+        # Преобразование в длительность импульса (нс)
+        if p >= 0:
+            pulse_ns = PULSE_STOP_NS + (p / (100.0 * self.just_kf)) * (PULSE_MAX_NS - PULSE_STOP_NS)
         else:
-            duty = DUTY_STOP + (power_percent / 100.0) * (DUTY_STOP - DUTY_MIN)
+            pulse_ns = PULSE_STOP_NS + (p / 100.0) * (PULSE_STOP_NS - PULSE_MIN_NS)
 
-        self.pwm.change_duty_cycle(duty)
-        if output:print(f"Канал {self.pwm.pwm_channel}: {power_percent:4}% -> duty {duty:.2f}%")
+        pulse_ns = max(PULSE_MIN_NS, min(PULSE_MAX_NS, pulse_ns))
+
+        # Преобразовать в процент заполнения (0..100) относительно периода
+        duty_percent = (pulse_ns / PERIOD_NS) * 100.0
+
+        # Отправить ШИМ-сигнал
+        lgpio.tx_pwm(self.handle, self.gpio_pin, self.freq, duty_percent, 0, 0)
+
+        if output:
+            print(f"Канал {self.pwm_channel} (GPIO{self.gpio_pin}): {p:4}% -> импульс {pulse_ns/1e6:.2f} мс (duty {duty_percent:.2f}%)")
 
     def stop(self):
-        self.pwm.stop()
+        """Остановить ШИМ и освободить ресурсы."""
+        if self._is_setup and self.handle is not None:
+            try:
+                lgpio.tx_pwm(self.handle, self.gpio_pin, 0, 0, 0, 0)
+                lgpio.gpio_free(self.handle, self.gpio_pin)
+                lgpio.gpiochip_close(self.handle)
+            except:
+                pass
+            self._is_setup = False
+            self.handle = None
 
-if __name__ == '__main__':
-    # Инициализация PWM
-    pwm2 = HardwarePWM(pwm_channel=PWM_CHANNEL_1, hz=PWM_FREQ, chip=PWM_CHIP)
-    pwm1 = HardwarePWM(pwm_channel=PWM_CHANNEL_2, hz=PWM_FREQ, chip=PWM_CHIP)
-
-    def set_motor(pwm, power_percent):
-        """
-        power_percent: от -100 до 100
-        """
-        # Ограничение
-        power_percent = max(-100, min(100, power_percent))
-
-        # Преобразование процента в duty cycle
-        if power_percent >= 0:
-            duty = DUTY_STOP + (power_percent / 100.0) * (DUTY_MAX - DUTY_STOP)
-        else:
-            duty = DUTY_STOP + (power_percent / 100.0) * (DUTY_STOP - DUTY_MIN)
-
-        pwm.change_duty_cycle(duty)
-        print(f"Канал {pwm.pwm_channel}: {power_percent:4}% -> duty {duty:.2f}%")
-
-    # Запуск ШИМ с начальным нулём (для инициализации)
-    print("Запуск PWM и инициализация (5 секунд стоп)...")
-    pwm1.start(DUTY_STOP)
-    pwm2.start(DUTY_STOP)
-    time.sleep(5)
-
-    print("Инициализация завершена. Начинаем тестовый цикл.")
-    try:
-        while True:
-            print("\n--- Полный вперёд (+100%) ---")
-            set_motor(pwm1, 100)
-            set_motor(pwm2, 100)
-            time.sleep(3)
-
-            print("\n--- Стоп (0%) ---")
-            set_motor(pwm1, 0)
-            set_motor(pwm2, 0)
-            time.sleep(3)
-
-            print("\n--- Полный назад (-100%) ---")
-            set_motor(pwm1, -100)
-            set_motor(pwm2, -100)
-            time.sleep(3)
-
-            print("\n--- Стоп (0%) ---")
-            set_motor(pwm1, 0)
-            set_motor(pwm2, 0)
-            time.sleep(3)
-
-            print("\n--- Полный поворот (-100%, 100%) ---")
-            set_motor(pwm1, -100)
-            set_motor(pwm2, 100)
-            time.sleep(3)
-
-            print("\n--- Стоп (0%) ---")
-            set_motor(pwm1, 0)
-            set_motor(pwm2, 0)
-            time.sleep(3)
-
-            print("\n--- Полный поворот (100%, -100%) ---")
-            set_motor(pwm1, 100)
-            set_motor(pwm2, -100)
-            time.sleep(3)
-
-            print("\n--- Стоп (0%) ---")
-            set_motor(pwm1, 0)
-            set_motor(pwm2, 0)
-            time.sleep(3)
-    except KeyboardInterrupt:
-        print("\nПрограмма остановлена пользователем.")
-    finally:
-        # Останавливаем сигналы и выключаем PWM
-        print("Остановка моторов и выход...")
-        set_motor(pwm1, 0)
-        set_motor(pwm2, 0)
-        time.sleep(1)
-        pwm1.stop()
-        pwm2.stop()
-        print("Готово.")
+    def __del__(self):
+        self.stop()

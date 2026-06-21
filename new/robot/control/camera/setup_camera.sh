@@ -40,8 +40,8 @@ apt upgrade -y
 
 # 2. Установка необходимых пакетов
 print_info "Установка необходимых пакетов..."
-apt install -y python3-picamera2 python3-opencv v4l-utils i2c-tools
-
+apt install -y python3-picamera2 python3-opencv v4l-utils i2c-tools python3-pip
+pip3 install flask --break-system-packages
 # 3. Настройка config.txt
 CONFIG_FILE="/boot/firmware/config.txt"
 if [ ! -f "$CONFIG_FILE" ]; then
