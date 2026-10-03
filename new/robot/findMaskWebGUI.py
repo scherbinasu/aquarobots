@@ -1,70 +1,121 @@
+import os
+
 import cv2
 from control.camera.camera import HardCamera
 from findMask import *
 from control.web.webGUI import WebGUI
+import json
 
+
+
+
+def save_python_lib_color(presets):
+    with open('/home/ubuntu/aquarobots/new/colors.py', "w") as f:
+        data = f'''
+Red = {presets['1']}
+Green = {presets['2']}
+Yellow = {presets['3']}
+Orange = {presets['4']}
+        '''
+        f.write(data)
+def parse_python_lib_color():
+    PRESETS = {}
+    with open('/home/ubuntu/aquarobots/new/colors.py', 'r') as f:
+        data = f.read()
+        print(data)
+        data = data.split('{')
+        for i, line in enumerate(data[1:]):
+            line = line.split('}')[0].replace("'", '"')
+            PRESETS[str(i+1)] = json.loads("{"+line+"}")
+    return PRESETS
+
+# ---- 4 пресета (маски). Ключи должны совпадать с col ----
+PRESETS = parse_python_lib_color()
+print(PRESETS)
 def main():
-    # 1. Камера
     cap = HardCamera(size=(820, 616))
     cap.start()
 
-    # 2. Веб-интерфейс
     gui = WebGUI(host='0.0.0.0', port=5000)
 
-    # 3. Параметры HSV
-    col = {"obrez": "0", "h_min": "0", "s_min": "0", "s_max": "255", "v_min": "0", "v_max": "255", "h_max": "255"}
-    col = {"obrez": "190", "h_min": "8", "s_min": "184", "s_max": "255", "v_min": "41", "v_max": "255", "h_max": "30"}
+    # Рабочая копия параметров активного пресета — мутируется на месте.
+    current_slot = ["1"]
+    col = dict(PRESETS[current_slot[0]])
 
-    # 4. Колбэки для трекбаров
-    def on_h_min(val): col["h_min"] = val
-    def on_h_max(val): col["h_max"] = val
-    def on_s_min(val): col["s_min"] = val
-    def on_s_max(val): col["s_max"] = val
-    def on_v_min(val): col["v_min"] = val
-    def on_v_max(val): col["v_max"] = val
-    def on_obrez(val): col["obrez"] = val
+    KEYS = ["h_min", "h_max", "s_min", "s_max", "v_min", "v_max", "obrez"]
+    LABELS = {
+        "h_min": "H Min", "h_max": "H Max",
+        "s_min": "S Min", "s_max": "S Max",
+        "v_min": "V Min", "v_max": "V Max",
+        "obrez": "Obrez",
+    }
+    MAXS = {
+        "h_min": 180, "h_max": 180,
+        "s_min": 255, "s_max": 255,
+        "v_min": 255, "v_max": 255,
+        "obrez": 480,
+    }
 
-    # Создаём трекбары
-    gui.createTrackbar("H Min", "control", 0, 180, on_h_min)
-    gui.createTrackbar("H Max", "control", 180, 180, on_h_max)
-    gui.createTrackbar("S Min", "control", 0, 255, on_s_min)
-    gui.createTrackbar("S Max", "control", 255, 255, on_s_max)
-    gui.createTrackbar("V Min", "control", 0, 255, on_v_min)
-    gui.createTrackbar("V Max", "control", 255, 255, on_v_max)
-    gui.createTrackbar("Obrez", "control", 0, 480, on_obrez)
+    # Регистрируем слайдеры
+    for key in KEYS:
+        def make_cb(k):
+            def cb(val):
+                col[k] = int(val)
+            return cb
+        gui.createTrackbar(key, "control", col[key], MAXS[key],
+                           make_cb(key), label=LABELS[key])
 
-    # 5. Детектор ArUco
+    # ---- переключение пресета ----
+    def load_slot(slot_key):
+        current_slot[0] = str(slot_key)
+        col.clear()
+        col.update(PRESETS[current_slot[0]])
+        # Обновить слайдеры в UI
+        for k in KEYS:
+            gui.setTrackbarPos(k, col[k])
+
+    # ---- сохранение в активный пресет ----
+    def save_slot():
+        PRESETS[current_slot[0]] = dict(col)
+        save_python_lib_color(PRESETS)
+        print(f"[preset {current_slot[0]}] saved -> {PRESETS[current_slot[0]]}")
+
+    gui.setPresets(
+        options={"1": "Red", "2": "Green", "3": "Yellow", "4": "Orange"},
+        value=current_slot[0],
+        callback=load_slot,
+    )
+    gui.onSave(save_slot)
+
+    # ---- ArUco ----
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000)
     params = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(aruco_dict, params)
+
     gui.start()
     print("Сервер запущен. Откройте в браузере: http://<IP-адрес>:5000")
 
     while True:
-        frame = cap.get_frame()      # BGR
+        frame = cap.get_frame()
         if frame is None:
             continue
 
-        # Создаём маску
         mask = FindMask(frame)
-        # mask.normalize()
         mask.inRangeF(col)
 
-        # Детекция ArUco на исходном кадре
         corners, ids, _ = detector.detectMarkers(frame)
         if ids is not None:
             cv2.aruco.drawDetectedMarkers(frame, corners, ids)
 
-        # Отображаем два окна
-        gui.imshow("raw", frame)          # окно с именем "raw"
-        gui.imshow("masked", mask.frame)        # окно с именем "masked"
+        gui.imshow("raw", frame)
+        gui.imshow("masked", mask.frame)
 
-        # Задержка для управления частотой кадров (имитация waitKey)
-        if gui.waitKey(30) == ord('q'):   # всегда -1, но оставляем для совместимости
+        if gui.waitKey(30) == ord('q'):
             break
 
     cap.release()
     gui.destroyAllWindows()
+
 
 if __name__ == '__main__':
     main()

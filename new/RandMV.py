@@ -14,7 +14,7 @@ def stop():
     motor_left.stop()
     motor_right.stop()
 try:
-    mv(50, 50, 5)
+    mv(50, 50, 500)
     # input("Press Enter to continue...")
     mv(50, 50, 5)
     time_start = time.time()

@@ -1,14 +1,35 @@
-import colors, time
+import colors
 import traceback
 from robot.findMask import *
 from robot.robot import AquaRobot
 from control.web.webGUI import WebGUI
 import RPi.GPIO as GPIO
+import robot.findOpenCV as findOpenCV
+
+
+
+def findObj(frame, paramsObj):
+    try:
+        lower = (int(paramsObj['h_min']), int(paramsObj['s_min']), int(paramsObj['v_min']))
+        upper = (int(paramsObj['h_max']), int(paramsObj['s_max']), int(paramsObj['v_max']))
+        masked = cv2.inRange(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), lower, upper)
+        # Обрезка верхней части
+        obrez = int(paramsObj['obrez'])
+        if obrez > 0:
+            masked[:obrez, :] = 0
+
+        masked = findOpenCV.FindMask(masked)
+        c = masked.findContours()
+        c.compactness()
+
+
+    except:
+        self.frame = self.zeros_bit.copy()
+        return self.frame
 
 try:
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(4, GPIO.IN)
-    # GPIO.input(18)
     print(GPIO.input(4))
 
     # --- Веб-интерфейс для вывода данных ---
@@ -30,8 +51,6 @@ try:
 
     PID_yaw_gate = PID_regulator(-0.08, 0, 0, 0)
     PID_speed_gate = PID_regulator(0.0004, 0, 0, 90000)
-    detector = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100),
-                                       cv2.aruco.DetectorParameters())
 
     # выполнение всех портов
     while True:
