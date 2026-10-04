@@ -71,40 +71,16 @@ class FindMask:
 
     def getCenter(self):
         if self.__center is None or self.__moment is None:
-            __moment = cv2.moments(self.mask)
-            if m['m00'] > 0:
-                self.__center = Point((m["m10"] / m["m00"], m["m01"] / m["m00"]))
+            self.__moment = cv2.moments(self.mask)
+            if self.__moment['m00'] > 0:
+                self.__center = Point((self.__moment["m10"] / self.__moment["m00"], self.__moment["m01"] / self.__moment["m00"]))
             else:
                 self.__center = 0
         return self.__center
 
 
     def findContours(self):
-        return FindContours(cv2.findContours(self.mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)[0])
-
-
-class FindContours:
-    def __init__(self, Contours):
-        self.contours = map(lambda x: FindContour(x), Contours)
-
-    def compactness(self):
-        return list(map(lambda x: x.compactness, self.contours))
-
-    def approx(self, k=0.02):
-        return list(map(lambda x: x.approx(k), self.contours))
-
-    def getCenter(self):
-        return list(map(lambda x: x.getCenter, self.contours))
-    def Moment(self):
-        return list(map(lambda x: x.getCenter, self.contours))
-
-    def sortedContoursArea(self):
-        contours = sorted(self.contours, key=lambda x: x.getArea(), reverse=True)
-        self.contours = contours
-        return contours
-
-    def __iter__(self):
-        return iter(self.contours)
+        return list(map(lambda x: FindContour(x), (cv2.findContours(self.mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)[0])))
 
 
 class FindContour:
@@ -126,6 +102,11 @@ class FindContour:
         self.__Orientation = None
         self.__moment = None
 
+    # ========== Генератор ==========#
+    def genImg(self, size):
+        h, w = size[:2]
+        bw = np.zeros((h, w), dtype=np.uint8)
+        return cv2.drawContours(bw, [self.contour], -1, 255, -1)
     # ========== Преобразования ==========#
     def approx(self, k=0.02):
         perimeter = cv2.arcLength(self.contour, True)
@@ -145,13 +126,17 @@ class FindContour:
         return self.__compactness
 
     def getCenter(self):
-        if self.__center is None:
-            m = cv2.moments(self.contour)
-            if m['m00'] > 0:
-                self.__center = Point((m["m10"] / m["m00"], m["m01"] / m["m00"]))
+        if self.__center is None or self.__moment is None:
+            self.__moment = cv2.moments(self.contour)
+            if self.__moment['m00'] > 0:
+                self.__center = Point((self.__moment["m10"] / self.__moment["m00"], self.__moment["m01"] / self.__moment["m00"]))
             else:
                 self.__center = 0
         return self.__center
+    def moment(self):
+        if self.__moment is None or self.__moment is None:
+            self.__moment = cv2.moments(self.contour)
+        return self.__moment
 
     def getArea(self):
         if self.__area is None:

@@ -27,7 +27,7 @@ class HardCamera:
         # Захват кадра (блокируется до получения кадра)
         frame = self.picam2.capture_array()
         # Отражение по горизонтали и вертикали (если нужно – уберите или измените)
-        frame = cv2.flip(cv2.flip(frame, 1), 0)
+        # frame = cv2.flip(cv2.flip(frame, 1), 0)
         # Конвертация из RGBA в BGR
         frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
         return frame_bgr
